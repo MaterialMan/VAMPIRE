@@ -1,0 +1,162 @@
+// File with all functions required for reservoir computing
+// C++ standard library headers
+#include <string>
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <algorithm>
+
+// Vampire headers
+#include "cells.hpp"
+#include "micromagnetic.hpp"
+#include "errors.hpp"
+#include "vio.hpp"
+#include "units.hpp"
+#include "errors.hpp"
+
+// micromagnetic module headers
+#include "internal.hpp"
+
+namespace micromagnetic::reservoir{
+
+  // vectors to store applied field and output magnetisation, over time steps and individual cells
+  std::vector <std::vector <double>> source_field_cell;
+  std::vector<double> input_field;
+  std::vector<double> output_mag;
+  bool reservoircheck; // is set to false if no reservoir input file is found, allowing vampire to continue normally
+
+  // vars needed for updating the field input and storing H for each cell at each timestep
+  int fieldstate=-1;
+  int totaltimesteps=301000; // needs to be the same as "total time steps" in the vampire input file!
+  int timestep=1000; //number of sim:timesteps until input signal is changed and output is read
+  int timestepcounter=0;
+  std::vector <std::vector <double>> Mag_cell_and_time;
+  bool cells_source_output = false; //set to false for no external field data output used for plotting
+
+  // reads data from sources input file
+  void read_field(){
+
+    // variables to store source field data
+    std::vector <double> xmin;
+    std::vector <double> xmax;
+    std::vector <double> ymin;
+    std::vector <double> ymax;
+    std::vector <std::vector <double>> sourcefield(2);
+    std::string line;
+
+    std::ifstream file ("sourcefield.txt");
+    if (file.is_open()){
+        
+        int samples = file.tellg();
+      std::string a;
+      std::string b;
+      std::string c;
+      std::string d;
+
+      while (file >> a >> b >> c >>d){
+        if (d!="0"){ // differenciate between position parameters and field values
+          xmin.push_back(atof(a.c_str()));
+          xmax.push_back(atof(b.c_str()));
+          ymin.push_back(atof(c.c_str()));
+          ymax.push_back(atof(d.c_str()));
+        }
+        else{
+            for (int i=0; i < ; i++){
+                sourcefield[i].push_back(atof(b.c_str()));
+            }
+        }
+      }
+      file.close();
+
+      // get the lengths of each side of the rectangular system
+      double sidelength_x = 0;
+      double sidelength_y = 0;
+      for (int i=0; i < cells::pos_and_mom_array.size()/4; i++){
+        if (cells::pos_and_mom_array[4*i+0]>sidelength_x){
+          sidelength_x=cells::pos_and_mom_array[4*i+0];
+        }
+        if (cells::pos_and_mom_array[4*i+1]>sidelength_y){
+          sidelength_y=cells::pos_and_mom_array[4*i+1];
+        }
+      }
+
+      // assign the appropiate external field to each cell, fields are additive over sources
+      source_field_cell.resize(cells::num_cells, std::vector <double> (sourcefield[0].size(), 0));
+      for (int i=0; i<cells::num_cells; ++i){
+        for (int j=0; j<xmin.size(); ++j){
+          if (xmin[j]*sidelength_x<= cells::pos_and_mom_array[4*i+0] && cells::pos_and_mom_array[4*i+0]<=xmax[j]*sidelength_x){
+            if (ymin[j]*sidelength_y<= cells::pos_and_mom_array[4*i+1] && cells::pos_and_mom_array[4*i+1]<=ymax[j]*sidelength_y){
+              std::transform (sourcefield[j].begin(), sourcefield[j].end(), source_field_cell[i].begin(), source_field_cell[i].begin(), std::plus<float>());
+            }
+          }
+        }
+      }
+      std::cout << "Number of cells: " << cells::num_cells << std::endl;
+
+      input_field.resize(cells::num_cells, 0);
+      Mag_cell_and_time.resize(cells::num_cells, std::vector <double> (totaltimesteps/timestep));
+      output_mag.resize(cells::num_cells, 0);
+
+      reservoircheck = true;
+    } // end of file.is_open case
+
+    else{ // input file not opened
+      terminaltextcolor(RED);
+      std::cout << "Field source file for reservoir computing was not found!" << std::endl;
+      reservoircheck = false;
+      input_field.resize(cells::num_cells, 0);
+      terminaltextcolor(WHITE);
+    }
+
+    return;
+  } // end of readfile function
+
+
+  // function called whenever LLG is called (at each sim:timestep)
+  void update_field(){
+
+    if (reservoircheck==true){
+      ++timestepcounter;
+      if (timestepcounter==timestep){ // after (timestep) number of LLG calculations, update field and save magnetisation state
+        ++fieldstate;
+        timestepcounter=0;
+        input_field.clear();
+        for (int i=0; i<cells::num_cells; ++i){
+          input_field.push_back(source_field_cell[i][fieldstate]);
+          Mag_cell_and_time[i][fieldstate] = output_mag[i];
+        }
+        if (cells_source_output == true) { // if plotting activated, make file with the external field data for each cell
+          std::ofstream o;
+          char buffer [100];
+          sprintf(buffer, "cells_sources_output-%08i.txt", fieldstate);
+          o.open(buffer);
+          for (int i=0; i<cells::num_cells; ++i){
+            o << source_field_cell[i][fieldstate] << std::endl;
+          }
+          o.close();
+        }
+      }
+    }
+
+    return;
+  } // end of update_field function
+
+  // outputs magnetisation data for each cell to .txt at each interval
+  void output_field(){
+
+    if (reservoircheck==true){ // write reservoir_output file 
+      std::ofstream w;
+      w.open("reservoir_output.txt");
+      for (int i=0; i<Mag_cell_and_time[0].size() - 1; ++i){
+        for (int j=0; j<cells::num_cells; ++j){
+          w << Mag_cell_and_time[j][i+1] << " ";
+        }
+        w << std::endl;
+      }
+      w.close();
+    }
+
+    return;
+  } // end of output_field function
+
+} // end of micromagnetic::reservoir namespace
