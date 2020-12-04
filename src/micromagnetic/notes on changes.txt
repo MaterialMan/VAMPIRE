@@ -1,0 +1,5 @@
+
+
+Currently changing the ability to perturb x,y,z as inputs.
+
+Made changes in internal.hpp, read-applied_field.cpp, fieldsllg.cpp. Need to finish how to get data from input file. 

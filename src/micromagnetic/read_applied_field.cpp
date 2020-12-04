@@ -23,9 +23,10 @@ namespace micromagnetic::reservoir{
 
   // vectors to store applied field and output magnetisation, over time steps and individual cells
   std::vector <std::vector <double>> source_field_cell;
-  std::vector<double> input_field;
+  // std::vector<double> input_field; //prev version
+  std::vector <std::vector <double>> input_field;
   
-  // for Z-direction only
+// for Z-direction only
   //std::vector<double> output_mag;
   // all three dimensions
   std::vector <std::vector <double>> output_mag;
@@ -139,8 +140,10 @@ namespace micromagnetic::reservoir{
 
       std::cout << "Number of cells: " << cells::num_cells << std::endl;
 
-      input_field.resize(cells::num_cells, 0);
-      
+	int dimensions = 3;
+      //input_field.resize(cells::num_cells, 0);
+      input_field.resize(cells::num_cells,std::vector <double> (dimensions));
+
       // store H
       //Mag_cell_and_time.resize(cells::num_cells, std::vector <double> (sim::total_time/sim::partial_time));
       Mag_cell_and_time_x.resize(cells::num_cells, std::vector <double> (sim::total_time/sim::partial_time));
@@ -148,8 +151,7 @@ namespace micromagnetic::reservoir{
       Mag_cell_and_time_z.resize(cells::num_cells, std::vector <double> (sim::total_time/sim::partial_time));
       
       //output_mag.resize(cells::num_cells, 0); // Z only
-      int dimensions = 3;
-      output_mag.resize(cells::num_cells,  std::vector <double> (dimensions)); // all three directions
+	output_mag.resize(cells::num_cells,  std::vector <double> (dimensions)); // all three directions
       
 
       reservoircheck = true;
@@ -159,7 +161,8 @@ namespace micromagnetic::reservoir{
       terminaltextcolor(RED);
       std::cout << "Field source file for reservoir computing was not found!" << std::endl;
       reservoircheck = false;
-      input_field.resize(cells::num_cells, 0);
+      //input_field.resize(cells::num_cells, 0);
+	input_field.resize(cells::num_cells, std::vector <double> (dimensions));
       terminaltextcolor(WHITE);
     }
 
@@ -180,14 +183,17 @@ namespace micromagnetic::reservoir{
       input_field.clear();
 
       for (int i=0; i<cells::num_cells; ++i){
-        input_field.push_back(source_field_cell[i][fieldstate]);
+
+	// update input to reservoir
+        // input_field.push_back(source_field_cell[i][fieldstate]); // for Z only
+	input_field[i][0]=source_field_cell[i][fieldstate]); 
+	input_field[i][1]=source_field_cell[i][fieldstate]);
+	input_field[i][2]=source_field_cell[i][fieldstate]);
 
         //update output
-        //Mag_cell_and_time[i][fieldstate] = output_mag[i];
         Mag_cell_and_time_x[i][fieldstate] = output_mag[i][0];
         Mag_cell_and_time_y[i][fieldstate] = output_mag[i][1];
         Mag_cell_and_time_z[i][fieldstate] = output_mag[i][2];
-        //std::cout << "x: " << output_mag[i][0] << "y: " << output_mag[i][1] << "z: " << output_mag[i][2]<< std::endl;
       }
 
       if (sim::cells_source_output == true) { // if plotting activated, make file with the external field data for each cell

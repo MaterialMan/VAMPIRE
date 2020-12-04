@@ -162,8 +162,10 @@ namespace micromagnetic{
 
 namespace reservoir{ // for reservoir computing tests
 
-  // stores input field
-  extern std::vector<double> input_field;
+  // stores input field for Z-direction only
+  // extern std::vector<double> input_field;
+// all three dimensions
+ extern std::vector <std::vector <double>> input_field;
 
   // for Z-direction only
   //extern std::vector<double> output_mag;
